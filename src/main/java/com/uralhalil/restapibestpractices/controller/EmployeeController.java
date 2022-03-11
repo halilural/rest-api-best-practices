@@ -1,30 +1,46 @@
 package com.uralhalil.restapibestpractices.controller;
 
+import com.uralhalil.restapibestpractices.controller.assembler.EmployeeModelAssembler;
 import com.uralhalil.restapibestpractices.exception.EmployeeNotFoundException;
 import com.uralhalil.restapibestpractices.model.Employee;
 import com.uralhalil.restapibestpractices.repository.EmployeeRepository;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 /**
  * @author HalilURAL
  */
 @RestController
-class EmployeeController {
+public class EmployeeController {
 
     private final EmployeeRepository repository;
 
-    EmployeeController(EmployeeRepository repository) {
+    private final EmployeeModelAssembler assembler;
+
+    EmployeeController(EmployeeRepository repository, EmployeeModelAssembler assembler) {
+
         this.repository = repository;
+        this.assembler = assembler;
     }
 
 
     // Aggregate root
     // tag::get-aggregate-root[]
     @GetMapping("/employees")
-    List<Employee> all() {
-        return repository.findAll();
+    public CollectionModel<EntityModel<Employee>> all() {
+
+        List<EntityModel<Employee>> employees = repository.findAll().stream() //
+                .map(assembler::toModel) //
+                .collect(Collectors.toList());
+
+        return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
     }
     // end::get-aggregate-root[]
 
@@ -36,10 +52,12 @@ class EmployeeController {
     // Single item
 
     @GetMapping("/employees/{id}")
-    Employee one(@PathVariable Long id) {
+    public EntityModel<Employee> one(@PathVariable Long id) {
 
-        return repository.findById(id)
+        Employee employee = repository.findById(id) //
                 .orElseThrow(() -> new EmployeeNotFoundException(id));
+
+        return assembler.toModel(employee);
     }
 
     @PutMapping("/employees/{id}")
